@@ -1,0 +1,10 @@
+spec {
+    name "main"
+    prefix "r"
+    include "docs/spec.md"
+
+    impl {
+        name "rust"
+        include "**/*.rs"
+    }
+}
