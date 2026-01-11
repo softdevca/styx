@@ -1,0 +1,8 @@
+specs:
+  - name: main
+    prefix: r
+    include:
+      - docs/spec.md
+    impls:
+      - name: rust
+        include: "**/*.rs"
