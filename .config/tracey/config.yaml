@@ -5,4 +5,5 @@ specs:
       - docs/spec.md
     impls:
       - name: rust
-        include: "**/*.rs"
+        include:
+          - "**/*.rs"
