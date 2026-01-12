@@ -2,7 +2,7 @@ specs:
   - name: parser
     prefix: r
     include:
-      - docs/020-parser-spec.md
+      - docs/content/spec/parser.md
     impls:
       - name: rust
         include:
@@ -11,7 +11,7 @@ specs:
   - name: schema
     prefix: r
     include:
-      - docs/030-schema-spec.md
+      - docs/content/spec/schema.md
     impls:
       - name: rust
         include:
@@ -20,7 +20,7 @@ specs:
   - name: diagnostics
     prefix: r
     include:
-      - docs/050-diagnostics-spec.md
+      - docs/content/spec/diagnostics.md
     impls:
       - name: rust
         include:

@@ -1,0 +1,7 @@
+# Dodeca configuration for styx docs
+title: STYX
+content: docs/content
+output: docs/public
+
+stable_assets:
+  - "docs/static/favicon.svg favicon.svg"
