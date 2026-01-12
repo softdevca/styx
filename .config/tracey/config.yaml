@@ -17,15 +17,6 @@ specs:
         include:
           - "**/*.rs"
 
-  - name: deserializer
-    prefix: r
-    include:
-      - docs/004-deserializer-spec.md
-    impls:
-      - name: rust
-        include:
-          - "**/*.rs"
-
   - name: diagnostics
     prefix: r
     include:
