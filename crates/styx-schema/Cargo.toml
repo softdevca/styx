@@ -11,3 +11,5 @@ facet = "0.42"
 
 [dev-dependencies]
 facet-format = "0.42"
+test-log = { version = "0.2", features = ["trace"] }
+tracing = "0.1"
