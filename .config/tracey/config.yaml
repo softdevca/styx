@@ -1,6 +1,6 @@
 specs:
   - name: parser
-    prefix: r
+    prefix: parser
     include:
       - docs/content/spec/parser.md
     impls:
@@ -9,7 +9,7 @@ specs:
           - "**/*.rs"
 
   - name: schema
-    prefix: r
+    prefix: schema
     include:
       - docs/content/spec/schema.md
     impls:
@@ -18,7 +18,7 @@ specs:
           - "**/*.rs"
 
   - name: diagnostics
-    prefix: r
+    prefix: diag
     include:
       - docs/content/spec/diagnostics.md
     impls:
