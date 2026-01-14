@@ -1,4 +1,5 @@
 .tracey/
 .cache
+.claude
 target/
 Cargo.lock
