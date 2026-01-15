@@ -2,4 +2,4 @@
 source: crates/styx-schema/src/generate.rs
 expression: schema
 ---
-Status @enum{Active @unit, Inactive @unit, Pending @unit}
+@ @enum{Active @unit, Inactive @unit, Pending @unit}

@@ -2,4 +2,4 @@
 source: crates/styx-schema/src/generate.rs
 expression: schema
 ---
-Message @enum{Text @string, Number @int, Compound @object{x @int, y @int}}
+@ @enum{Text @string, Number @int, Compound @object{x @int, y @int}}

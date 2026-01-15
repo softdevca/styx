@@ -15,8 +15,8 @@ pub struct SchemaFile {
     /// Maps namespace prefixes to external schema locations.
     pub imports: Option<HashMap<String, String>>,
     /// Type definitions.
-    /// Keys are type names as strings. The key "@" represents the document root.
-    pub schema: HashMap<String, Schema>,
+    /// Keys are type names (Some) or unit (None) for the document root.
+    pub schema: HashMap<Option<String>, Schema>,
 }
 
 /// Schema metadata.
@@ -150,10 +150,10 @@ pub struct FloatConstraints {
 
 /// Object schema: @object{field @Schema, @ @Schema}.
 /// Maps field names to their type constraints.
-/// The key "@" represents additional fields (catch-all).
+/// The key `None` represents additional fields (catch-all `@`).
 #[derive(Facet, Debug, Clone)]
 #[repr(transparent)]
-pub struct ObjectSchema(pub HashMap<String, Schema>);
+pub struct ObjectSchema(pub HashMap<Option<String>, Schema>);
 
 /// Sequence schema: @seq(@Schema).
 /// All elements must match the inner schema.

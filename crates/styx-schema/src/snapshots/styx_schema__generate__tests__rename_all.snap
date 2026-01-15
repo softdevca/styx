@@ -2,4 +2,4 @@
 source: crates/styx-schema/src/generate.rs
 expression: schema
 ---
-ApiResponse @object{userName @string, createdAt @string}
+@ @object{userName @string, createdAt @string}

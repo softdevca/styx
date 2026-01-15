@@ -11,8 +11,8 @@ use alloc::vec::Vec;
 
 use facet::{Def, EnumType, Facet, Field, FieldFlags, Shape, StructKind, Type, UserType};
 use styx_format::{FormatOptions, format_value};
-use styx_parse::{ScalarKind, Separator};
-use styx_tree::{Entry, Object, Scalar, Sequence, Tagged, Value};
+use styx_parse::Separator;
+use styx_tree::{Entry, Object, Payload, Sequence, Tag, Value};
 
 /// Generate a Styx schema string from a Facet type.
 ///
@@ -31,28 +31,29 @@ use styx_tree::{Entry, Object, Scalar, Sequence, Tagged, Value};
 /// let schema = to_styx_schema::<User>("User");
 /// // User @object{ name @string, age @int }
 /// ```
-pub fn to_styx_schema<T: Facet<'static>>(root_name: &str) -> String {
+pub fn to_styx_schema<T: Facet<'static>>() -> String {
     let mut generator = StyxSchemaGenerator::new();
-    generator.add_root::<T>(root_name);
+    generator.add_root::<T>();
     let value = generator.finish_value();
     format_value(&value, FormatOptions::default())
 }
 
 /// Generate a Styx schema as a Value tree from a Facet type.
-pub fn to_styx_schema_value<T: Facet<'static>>(root_name: &str) -> Value {
+pub fn to_styx_schema_value<T: Facet<'static>>() -> Value {
     let mut generator = StyxSchemaGenerator::new();
-    generator.add_root::<T>(root_name);
+    generator.add_root::<T>();
     generator.finish_value()
 }
 
 /// Generator for Styx schema definitions.
 pub struct StyxSchemaGenerator {
     /// Type definitions: (name, value, doc_comment)
-    definitions: Vec<(String, Value, Option<String>)>,
+    /// Name is None for root type, Some(name) for named types
+    definitions: Vec<(Option<String>, Value, Option<String>)>,
     /// Types already generated (by type identifier)
     generated: BTreeSet<&'static str>,
     /// Types queued for generation: (name_to_use, shape)
-    queue: Vec<(String, &'static Shape)>,
+    queue: Vec<(Option<String>, &'static Shape)>,
 }
 
 impl Default for StyxSchemaGenerator {
@@ -71,9 +72,9 @@ impl StyxSchemaGenerator {
         }
     }
 
-    /// Add a root type with a custom name.
-    pub fn add_root<T: Facet<'static>>(&mut self, name: &str) {
-        self.queue.push((name.to_string(), T::SHAPE));
+    /// Add a root type (with None as name, serialized as unit `@`).
+    pub fn add_root<T: Facet<'static>>(&mut self) {
+        self.queue.push((None, T::SHAPE));
     }
 
     /// Add a type to generate using its Rust type identifier as name.
@@ -84,7 +85,8 @@ impl StyxSchemaGenerator {
     /// Add a shape to generate.
     fn add_shape(&mut self, shape: &'static Shape) {
         if !self.generated.contains(shape.type_identifier) {
-            self.queue.push((shape.type_identifier.to_string(), shape));
+            self.queue
+                .push((Some(shape.type_identifier.to_string()), shape));
         }
     }
 
@@ -101,33 +103,24 @@ impl StyxSchemaGenerator {
             }
         }
 
-        // Sort definitions for stable output (root "@" first, then alphabetically)
-        self.definitions.sort_by(|a, b| {
-            if a.0 == "@" {
-                core::cmp::Ordering::Less
-            } else if b.0 == "@" {
-                core::cmp::Ordering::Greater
-            } else {
-                a.0.cmp(&b.0)
-            }
-        });
+        // Sort definitions for stable output (root None first, then alphabetically)
+        self.definitions.sort_by(|a, b| a.0.cmp(&b.0));
 
         // Build output object
         let entries: Vec<Entry> = self
             .definitions
             .into_iter()
             .map(|(name, value, doc)| Entry {
-                key: scalar(&name),
+                key: match name {
+                    None => Value::unit(),
+                    Some(s) => scalar(&s),
+                },
                 value,
                 doc_comment: doc,
             })
             .collect();
 
-        Value::Object(Object {
-            entries,
-            separator: Separator::Newline,
-            span: None,
-        })
+        object_value(entries, Separator::Newline)
     }
 
     /// Finish generation and return the Styx schema string.
@@ -208,14 +201,7 @@ impl StyxSchemaGenerator {
                     })
                     .collect();
 
-                tag(
-                    "object",
-                    Some(Value::Object(Object {
-                        entries,
-                        separator: Separator::Comma,
-                        span: None,
-                    })),
-                )
+                tag("object", Some(object_value(entries, Separator::Comma)))
             }
         }
     }
@@ -268,11 +254,7 @@ impl StyxSchemaGenerator {
 
                         tag(
                             "object",
-                            Some(Value::Object(Object {
-                                entries: field_entries,
-                                separator: Separator::Comma,
-                                span: None,
-                            })),
+                            Some(object_value(field_entries, Separator::Comma)),
                         )
                     }
                 };
@@ -285,14 +267,7 @@ impl StyxSchemaGenerator {
             })
             .collect();
 
-        tag(
-            "enum",
-            Some(Value::Object(Object {
-                entries,
-                separator: Separator::Comma,
-                span: None,
-            })),
-        )
+        tag("enum", Some(object_value(entries, Separator::Comma)))
     }
 
     fn type_for_shape(&mut self, shape: &'static Shape) -> Value {
@@ -310,7 +285,10 @@ impl StyxSchemaGenerator {
                 let value_type = self.type_for_shape(map.v);
 
                 // Check if key is @string
-                let is_string_key = matches!(&key_type, Value::Tagged(t) if t.tag == "string" && t.payload.is_none());
+                let is_string_key = matches!(
+                    &key_type,
+                    Value { tag: Some(t), payload: None, .. } if t.name == "string"
+                );
 
                 if is_string_key {
                     tag("map", Some(value_type))
@@ -419,23 +397,66 @@ fn clean_doc(doc: &[&str]) -> Option<String> {
 }
 
 fn scalar(text: &str) -> Value {
-    Value::Scalar(Scalar {
-        text: text.to_string(),
-        kind: ScalarKind::Bare,
-        span: None,
-    })
+    Value::scalar(text)
 }
 
 fn tag(name: &str, payload: Option<Value>) -> Value {
-    Value::Tagged(Tagged {
-        tag: name.to_string(),
-        payload: payload.map(Box::new),
+    // Build a tagged value: @name or @name(payload)
+    let tag = Tag {
+        name: name.to_string(),
         span: None,
-    })
+    };
+    match payload {
+        None => Value {
+            tag: Some(tag),
+            payload: None,
+            span: None,
+        },
+        Some(v) => {
+            // Use the payload directly from the inner value
+            // If it's an object/sequence, use that payload; otherwise wrap scalar in sequence
+            let inner_payload = match v.payload {
+                Some(Payload::Object(o)) => Payload::Object(o),
+                Some(Payload::Sequence(s)) => Payload::Sequence(s),
+                Some(Payload::Scalar(s)) => Payload::Sequence(Sequence {
+                    items: vec![Value {
+                        tag: v.tag,
+                        payload: Some(Payload::Scalar(s)),
+                        span: None,
+                    }],
+                    span: None,
+                }),
+                None => {
+                    // Inner value is unit or just a tag - wrap it
+                    Payload::Sequence(Sequence {
+                        items: vec![v],
+                        span: None,
+                    })
+                }
+            };
+            Value {
+                tag: Some(tag),
+                payload: Some(inner_payload),
+                span: None,
+            }
+        }
+    }
 }
 
 fn sequence(items: Vec<Value>) -> Value {
-    Value::Sequence(Sequence { items, span: None })
+    Value::seq(items)
+}
+
+fn object_value(entries: Vec<Entry>, separator: Separator) -> Value {
+    Value {
+        tag: None,
+        payload: Some(Payload::Object(Object {
+            entries,
+            separator,
+            span: None,
+        })),
+        span: None,
+    }
 }
 
 #[cfg(test)]
@@ -452,7 +473,7 @@ mod tests {
             age: u32,
         }
 
-        let schema = to_styx_schema::<User>("User");
+        let schema = to_styx_schema::<User>();
         insta::assert_snapshot!(schema);
     }
 
@@ -464,7 +485,7 @@ mod tests {
             optional: Option<String>,
         }
 
-        let schema = to_styx_schema::<Config>("Config");
+        let schema = to_styx_schema::<Config>();
         insta::assert_snapshot!(schema);
     }
 
@@ -478,7 +499,7 @@ mod tests {
             Pending,
         }
 
-        let schema = to_styx_schema::<Status>("Status");
+        let schema = to_styx_schema::<Status>();
         insta::assert_snapshot!(schema);
     }
 
@@ -489,7 +510,7 @@ mod tests {
             items: Vec<String>,
         }
 
-        let schema = to_styx_schema::<Data>("Data");
+        let schema = to_styx_schema::<Data>();
         insta::assert_snapshot!(schema);
     }
 
@@ -506,7 +527,7 @@ mod tests {
             name: String,
         }
 
-        let schema = to_styx_schema::<Outer>("Outer");
+        let schema = to_styx_schema::<Outer>();
         insta::assert_snapshot!(schema);
     }
 
@@ -519,7 +540,7 @@ mod tests {
             entries: HashMap<String, i32>,
         }
 
-        let schema = to_styx_schema::<Registry>("Registry");
+        let schema = to_styx_schema::<Registry>();
         insta::assert_snapshot!(schema);
     }
 
@@ -534,7 +555,7 @@ mod tests {
             Compound { x: i32, y: i32 },
         }
 
-        let schema = to_styx_schema::<Message>("Message");
+        let schema = to_styx_schema::<Message>();
         insta::assert_snapshot!(schema);
     }
 
@@ -546,7 +567,7 @@ mod tests {
             next: Option<Box<Node>>,
         }
 
-        let schema = to_styx_schema::<Node>("Node");
+        let schema = to_styx_schema::<Node>();
         insta::assert_snapshot!(schema);
     }
 
@@ -559,7 +580,7 @@ mod tests {
             created_at: String,
         }
 
-        let schema = to_styx_schema::<ApiResponse>("ApiResponse");
+        let schema = to_styx_schema::<ApiResponse>();
         insta::assert_snapshot!(schema);
     }
 
@@ -567,7 +588,7 @@ mod tests {
     fn test_schema_file_type() {
         use crate::types::SchemaFile;
 
-        let schema = to_styx_schema::<SchemaFile>("@");
+        let schema = to_styx_schema::<SchemaFile>();
         insta::assert_snapshot!(schema);
     }
 
@@ -582,7 +603,7 @@ mod tests {
             age: u32,
         }
 
-        let schema = to_styx_schema::<User>("User");
+        let schema = to_styx_schema::<User>();
         insta::assert_snapshot!(schema);
     }
 }

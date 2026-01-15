@@ -2,4 +2,4 @@
 source: crates/styx-schema/src/generate.rs
 expression: schema
 ---
-Registry @object{entries @map(@int)}
+@ @object{entries @map(@int)}

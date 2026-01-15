@@ -97,15 +97,15 @@ mod tests {
 
         // Verify schema definitions exist
         assert!(
-            schema_file.schema.contains_key("@"),
+            schema_file.schema.contains_key(&None),
             "Should have root definition"
         );
         assert!(
-            schema_file.schema.contains_key("Meta"),
+            schema_file.schema.contains_key(&Some("Meta".to_string())),
             "Should have Meta definition"
         );
         assert!(
-            schema_file.schema.contains_key("Schema"),
+            schema_file.schema.contains_key(&Some("Schema".to_string())),
             "Should have Schema definition"
         );
     }

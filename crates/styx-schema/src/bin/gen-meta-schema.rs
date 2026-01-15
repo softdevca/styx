@@ -5,6 +5,6 @@
 use styx_schema::{SchemaFile, to_styx_schema};
 
 fn main() {
-    let schema = to_styx_schema::<SchemaFile>("@");
+    let schema = to_styx_schema::<SchemaFile>();
     print!("{}", schema);
 }

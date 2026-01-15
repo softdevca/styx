@@ -2,4 +2,4 @@
 source: crates/styx-schema/src/generate.rs
 expression: schema
 ---
-Node @object{value @int, next @optional(@Node)}
+@ @object{value @int, next @optional(@Node)}

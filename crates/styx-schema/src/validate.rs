@@ -4,7 +4,7 @@
 
 use std::collections::HashSet;
 
-use styx_tree::Value;
+use styx_tree::{Payload, Value};
 
 use crate::error::{
     ValidationError, ValidationErrorKind, ValidationResult, ValidationWarning,
@@ -30,8 +30,8 @@ impl<'a> Validator<'a> {
 
     /// Validate a document against the schema's root type.
     pub fn validate_document(&self, doc: &Value) -> ValidationResult {
-        // Look up the root schema (key "@")
-        match self.schema_file.schema.get("@") {
+        // Look up the root schema (key None = unit/@)
+        match self.schema_file.schema.get(&None) {
             Some(root_schema) => self.validate_value(doc, root_schema, ""),
             None => {
                 let mut result = ValidationResult::ok();
@@ -49,7 +49,7 @@ impl<'a> Validator<'a> {
 
     /// Validate a value against a specific named type.
     pub fn validate_as_type(&self, value: &Value, type_name: &str) -> ValidationResult {
-        match self.schema_file.schema.get(type_name) {
+        match self.schema_file.schema.get(&Some(type_name.to_string())) {
             Some(schema) => self.validate_value(value, schema, ""),
             None => {
                 let mut result = ValidationResult::ok();
@@ -111,9 +111,9 @@ impl<'a> Validator<'a> {
     ) -> ValidationResult {
         let mut result = ValidationResult::ok();
 
-        let text = match value {
-            Value::Scalar(s) => &s.text,
-            _ => {
+        let text = match value.scalar_text() {
+            Some(t) => t,
+            None => {
                 result.error(ValidationError::new(
                     path,
                     ValidationErrorKind::ExpectedScalar,
@@ -164,28 +164,27 @@ impl<'a> Validator<'a> {
     ) -> ValidationResult {
         let mut result = ValidationResult::ok();
 
-        let parsed = match value {
-            Value::Scalar(s) => match s.text.parse::<i128>() {
-                Ok(n) => n,
-                Err(_) => {
-                    result.error(
-                        ValidationError::new(
-                            path,
-                            ValidationErrorKind::InvalidValue {
-                                reason: "not a valid integer".into(),
-                            },
-                            format!("'{}' is not a valid integer", s.text),
-                        )
-                        .with_span(s.span),
-                    );
-                    return result;
-                }
-            },
-            _ => {
+        let text = match value.scalar_text() {
+            Some(t) => t,
+            None => {
                 result.error(ValidationError::new(
                     path,
                     ValidationErrorKind::ExpectedScalar,
                     format!("expected integer, got {}", value_type_name(value)),
+                ));
+                return result;
+            }
+        };
+
+        let parsed = match text.parse::<i128>() {
+            Ok(n) => n,
+            Err(_) => {
+                result.error(ValidationError::new(
+                    path,
+                    ValidationErrorKind::InvalidValue {
+                        reason: "not a valid integer".into(),
+                    },
+                    format!("'{}' is not a valid integer", text),
                 ));
                 return result;
             }
@@ -228,28 +227,27 @@ impl<'a> Validator<'a> {
     ) -> ValidationResult {
         let mut result = ValidationResult::ok();
 
-        let parsed = match value {
-            Value::Scalar(s) => match s.text.parse::<f64>() {
-                Ok(n) => n,
-                Err(_) => {
-                    result.error(
-                        ValidationError::new(
-                            path,
-                            ValidationErrorKind::InvalidValue {
-                                reason: "not a valid number".into(),
-                            },
-                            format!("'{}' is not a valid number", s.text),
-                        )
-                        .with_span(s.span),
-                    );
-                    return result;
-                }
-            },
-            _ => {
+        let text = match value.scalar_text() {
+            Some(t) => t,
+            None => {
                 result.error(ValidationError::new(
                     path,
                     ValidationErrorKind::ExpectedScalar,
                     format!("expected number, got {}", value_type_name(value)),
+                ));
+                return result;
+            }
+        };
+
+        let parsed = match text.parse::<f64>() {
+            Ok(n) => n,
+            Err(_) => {
+                result.error(ValidationError::new(
+                    path,
+                    ValidationErrorKind::InvalidValue {
+                        reason: "not a valid number".into(),
+                    },
+                    format!("'{}' is not a valid number", text),
                 ));
                 return result;
             }
@@ -287,21 +285,18 @@ impl<'a> Validator<'a> {
     fn validate_bool(&self, value: &Value, path: &str) -> ValidationResult {
         let mut result = ValidationResult::ok();
 
-        match value {
-            Value::Scalar(s) if s.text == "true" || s.text == "false" => {}
-            Value::Scalar(s) => {
-                result.error(
-                    ValidationError::new(
-                        path,
-                        ValidationErrorKind::InvalidValue {
-                            reason: "not a valid boolean".into(),
-                        },
-                        format!("'{}' is not a valid boolean (expected true/false)", s.text),
-                    )
-                    .with_span(s.span),
-                );
+        match value.scalar_text() {
+            Some(text) if text == "true" || text == "false" => {}
+            Some(text) => {
+                result.error(ValidationError::new(
+                    path,
+                    ValidationErrorKind::InvalidValue {
+                        reason: "not a valid boolean".into(),
+                    },
+                    format!("'{}' is not a valid boolean (expected true/false)", text),
+                ));
             }
-            _ => {
+            None => {
                 result.error(ValidationError::new(
                     path,
                     ValidationErrorKind::ExpectedScalar,
@@ -342,9 +337,9 @@ impl<'a> Validator<'a> {
     ) -> ValidationResult {
         let mut result = ValidationResult::ok();
 
-        let obj = match value {
-            Value::Object(o) => o,
-            _ => {
+        let obj = match value.as_object() {
+            Some(o) => o,
+            None => {
                 result.error(ValidationError::new(
                     path,
                     ValidationErrorKind::ExpectedObject,
@@ -354,34 +349,37 @@ impl<'a> Validator<'a> {
             }
         };
 
-        let mut seen_fields: HashSet<&str> = HashSet::new();
-        let additional_schema = schema.0.get("@");
+        let mut seen_fields: HashSet<Option<&str>> = HashSet::new();
+        let additional_schema = schema.0.get(&None);
 
         for entry in &obj.entries {
-            let key_str = match &entry.key {
-                Value::Scalar(s) => s.text.as_str(),
-                Value::Unit => "@",
-                _ => {
-                    result.error(ValidationError::new(
-                        path,
-                        ValidationErrorKind::InvalidValue {
-                            reason: "object keys must be scalars or unit".into(),
-                        },
-                        "invalid object key",
-                    ));
-                    continue;
-                }
-            };
-
-            let field_path = if path.is_empty() {
-                key_str.to_string()
+            let key_opt: Option<&str> = if entry.key.is_unit() {
+                None
+            } else if let Some(s) = entry.key.as_str() {
+                Some(s)
             } else {
-                format!("{path}.{key_str}")
+                result.error(ValidationError::new(
+                    path,
+                    ValidationErrorKind::InvalidValue {
+                        reason: "object keys must be scalars or unit".into(),
+                    },
+                    "invalid object key",
+                ));
+                continue;
             };
 
-            seen_fields.insert(key_str);
+            let key_display = key_opt.unwrap_or("@");
+            let field_path = if path.is_empty() {
+                key_display.to_string()
+            } else {
+                format!("{path}.{key_display}")
+            };
 
-            if let Some(field_schema) = schema.0.get(key_str) {
+            seen_fields.insert(key_opt);
+
+            // Look up by Option<String> key
+            let lookup_key = key_opt.map(|s| s.to_string());
+            if let Some(field_schema) = schema.0.get(&lookup_key) {
                 result.merge(self.validate_value(&entry.value, field_schema, &field_path));
             } else if let Some(add_schema) = additional_schema {
                 result.merge(self.validate_value(&entry.value, add_schema, &field_path));
@@ -389,33 +387,34 @@ impl<'a> Validator<'a> {
                 result.error(ValidationError::new(
                     &field_path,
                     ValidationErrorKind::UnknownField {
-                        field: key_str.into(),
+                        field: key_display.into(),
                     },
-                    format!("unknown field '{key_str}'"),
+                    format!("unknown field '{key_display}'"),
                 ));
             }
         }
 
         // Check for missing required fields
         for (field_name, field_schema) in &schema.0 {
-            if field_name == "@" {
+            // Skip the catch-all "@" field
+            let Some(name) = field_name else {
                 continue;
-            }
+            };
 
-            if !seen_fields.contains(field_name.as_str()) {
+            if !seen_fields.contains(&Some(name.as_str())) {
                 // Optional and Default fields are not required
                 if !matches!(field_schema, Schema::Optional(_) | Schema::Default(_)) {
                     let field_path = if path.is_empty() {
-                        field_name.clone()
+                        name.clone()
                     } else {
-                        format!("{path}.{field_name}")
+                        format!("{path}.{name}")
                     };
                     result.error(ValidationError::new(
                         &field_path,
                         ValidationErrorKind::MissingField {
-                            field: field_name.clone(),
+                            field: name.clone(),
                         },
-                        format!("missing required field '{field_name}'"),
+                        format!("missing required field '{name}'"),
                     ));
                 }
             }
@@ -427,9 +426,9 @@ impl<'a> Validator<'a> {
     fn validate_seq(&self, value: &Value, schema: &SeqSchema, path: &str) -> ValidationResult {
         let mut result = ValidationResult::ok();
 
-        let seq = match value {
-            Value::Sequence(s) => s,
-            _ => {
+        let seq = match value.as_sequence() {
+            Some(s) => s,
+            None => {
                 result.error(ValidationError::new(
                     path,
                     ValidationErrorKind::ExpectedSequence,
@@ -452,9 +451,9 @@ impl<'a> Validator<'a> {
     fn validate_map(&self, value: &Value, schema: &MapSchema, path: &str) -> ValidationResult {
         let mut result = ValidationResult::ok();
 
-        let obj = match value {
-            Value::Object(o) => o,
-            _ => {
+        let obj = match value.as_object() {
+            Some(o) => o,
+            None => {
                 result.error(ValidationError::new(
                     path,
                     ValidationErrorKind::ExpectedObject,
@@ -481,9 +480,9 @@ impl<'a> Validator<'a> {
         };
 
         for entry in &obj.entries {
-            let key_str = match &entry.key {
-                Value::Scalar(s) => s.text.as_str(),
-                _ => {
+            let key_str = match entry.key.as_str() {
+                Some(s) => s,
+                None => {
                     result.error(ValidationError::new(
                         path,
                         ValidationErrorKind::InvalidValue {
@@ -569,17 +568,10 @@ impl<'a> Validator<'a> {
     fn validate_enum(&self, value: &Value, schema: &EnumSchema, path: &str) -> ValidationResult {
         let mut result = ValidationResult::ok();
 
-        let (tag, payload) = match value {
-            Value::Tagged(t) => (t.tag.as_str(), t.payload.as_deref()),
-            Value::Unit => {
-                result.error(ValidationError::new(
-                    path,
-                    ValidationErrorKind::ExpectedTagged,
-                    "expected tagged value for enum",
-                ));
-                return result;
-            }
-            _ => {
+        // An enum value must have a tag
+        let tag = match &value.tag {
+            Some(t) => t.name.as_str(),
+            None => {
                 result.error(ValidationError::new(
                     path,
                     ValidationErrorKind::ExpectedTagged,
@@ -592,11 +584,21 @@ impl<'a> Validator<'a> {
             }
         };
 
+        // Extract payload as a Value for recursive validation
+        let payload_value = match &value.payload {
+            None => None,
+            Some(p) => Some(Value {
+                tag: None,
+                payload: Some(p.clone()),
+                span: None,
+            }),
+        };
+
         let expected_variants: Vec<String> = schema.0.keys().cloned().collect();
 
         match schema.0.get(tag) {
             Some(variant_schema) => {
-                match (payload, variant_schema) {
+                match (&payload_value, variant_schema) {
                     (None, Schema::Unit) => {
                         // @variant with unit schema - OK
                     }
@@ -697,21 +699,18 @@ impl<'a> Validator<'a> {
     fn validate_literal(&self, value: &Value, expected: &str, path: &str) -> ValidationResult {
         let mut result = ValidationResult::ok();
 
-        match value {
-            Value::Scalar(s) if s.text == expected => {}
-            Value::Scalar(s) => {
-                result.error(
-                    ValidationError::new(
-                        path,
-                        ValidationErrorKind::InvalidValue {
-                            reason: format!("expected literal '{expected}', got '{}'", s.text),
-                        },
-                        format!("expected '{expected}', got '{}'", s.text),
-                    )
-                    .with_span(s.span),
-                );
+        match value.scalar_text() {
+            Some(text) if text == expected => {}
+            Some(text) => {
+                result.error(ValidationError::new(
+                    path,
+                    ValidationErrorKind::InvalidValue {
+                        reason: format!("expected literal '{expected}', got '{}'", text),
+                    },
+                    format!("expected '{expected}', got '{}'", text),
+                ));
             }
-            _ => {
+            None => {
                 result.error(ValidationError::new(
                     path,
                     ValidationErrorKind::ExpectedScalar,
@@ -747,7 +746,7 @@ impl<'a> Validator<'a> {
             }
             Some(name) => {
                 // Named type reference - look up in schema
-                if let Some(type_schema) = self.schema_file.schema.get(name) {
+                if let Some(type_schema) = self.schema_file.schema.get(&Some(name.to_string())) {
                     result.merge(self.validate_value(value, type_schema, path));
                 } else {
                     result.error(ValidationError::new(
@@ -765,12 +764,17 @@ impl<'a> Validator<'a> {
 
 /// Get a human-readable name for a value type.
 fn value_type_name(value: &Value) -> &'static str {
-    match value {
-        Value::Scalar(_) => "scalar",
-        Value::Unit => "unit",
-        Value::Tagged(_) => "tagged",
-        Value::Sequence(_) => "sequence",
-        Value::Object(_) => "object",
+    if value.is_unit() {
+        return "unit";
+    }
+    if value.tag.is_some() {
+        return "tagged";
+    }
+    match &value.payload {
+        None => "unit",
+        Some(Payload::Scalar(_)) => "scalar",
+        Some(Payload::Sequence(_)) => "sequence",
+        Some(Payload::Object(_)) => "object",
     }
 }
 

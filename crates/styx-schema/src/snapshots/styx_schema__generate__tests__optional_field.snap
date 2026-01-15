@@ -2,4 +2,4 @@
 source: crates/styx-schema/src/generate.rs
 expression: schema
 ---
-Config @object{required @string, optional @optional(@string)}
+@ @object{required @string, optional @optional(@string)}

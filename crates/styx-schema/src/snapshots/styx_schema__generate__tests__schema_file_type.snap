@@ -3,15 +3,15 @@ source: crates/styx-schema/src/generate.rs
 expression: schema
 ---
 /// A complete schema file.
-"@" @object{
+@ @object{
     /// Schema metadata (required).
     meta @Meta
     /// External schema imports (optional).
     /// Maps namespace prefixes to external schema locations.
-    imports @optional(@map(@string))
+    imports @optional(@string)
     /// Type definitions.
-    /// Keys are type names as strings. The key "@" represents the document root.
-    schema @map(@Schema)
+    /// Keys are type names (Some) or unit (None) for the document root.
+    schema @map(@optional (@string) @Schema)
 }
 
 /// Constraints for @float type.
@@ -58,7 +58,7 @@ Schema @enum{
     /// Any type: @any (accepts any value)
     any @unit
     /// Object schema: @object{field @type, @ @type}
-    object @map(@Schema)
+    object @map(@optional (@string) @Schema)
     /// Sequence schema: @seq(@type)
     seq @Schema
     /// Map schema: @map(@V) or @map(@K @V)
