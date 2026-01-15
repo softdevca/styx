@@ -1,3 +1,23 @@
+# Nextest configuration for styx
+
+experimental = ["setup-scripts"]
+
+[scripts.setup.set-env-unix]
+command = 'scripts/setup-test-env.sh'
+
+[scripts.setup.set-env-windows]
+command = 'scripts/setup-test-env.cmd'
+
 [profile.default]
 slow-timeout = { period = "2s", terminate-after = 1 }
 fail-fast = true
+
+[[profile.default.scripts]]
+filter = 'all()'
+platform = { host = "cfg(unix)" }
+setup = 'set-env-unix'
+
+[[profile.default.scripts]]
+filter = 'all()'
+platform = { host = "cfg(windows)" }
+setup = 'set-env-windows'
