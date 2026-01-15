@@ -125,8 +125,8 @@ impl<'a> Validator<'a> {
 
         // Apply constraints if present
         if let Some(c) = constraints {
-            if let Some(min) = c.min_len {
-                if text.len() < min {
+            if let Some(min) = c.min_len
+                && text.len() < min {
                     result.error(ValidationError::new(
                         path,
                         ValidationErrorKind::InvalidValue {
@@ -135,9 +135,8 @@ impl<'a> Validator<'a> {
                         format!("string too short (min length: {})", min),
                     ));
                 }
-            }
-            if let Some(max) = c.max_len {
-                if text.len() > max {
+            if let Some(max) = c.max_len
+                && text.len() > max {
                     result.error(ValidationError::new(
                         path,
                         ValidationErrorKind::InvalidValue {
@@ -146,7 +145,6 @@ impl<'a> Validator<'a> {
                         format!("string too long (max length: {})", max),
                     ));
                 }
-            }
             if let Some(pattern) = &c.pattern {
                 // TODO: compile and match regex
                 let _ = pattern; // Suppress unused warning for now
@@ -192,8 +190,8 @@ impl<'a> Validator<'a> {
 
         // Apply constraints
         if let Some(c) = constraints {
-            if let Some(min) = c.min {
-                if parsed < min {
+            if let Some(min) = c.min
+                && parsed < min {
                     result.error(ValidationError::new(
                         path,
                         ValidationErrorKind::InvalidValue {
@@ -202,9 +200,8 @@ impl<'a> Validator<'a> {
                         format!("value too small (min: {})", min),
                     ));
                 }
-            }
-            if let Some(max) = c.max {
-                if parsed > max {
+            if let Some(max) = c.max
+                && parsed > max {
                     result.error(ValidationError::new(
                         path,
                         ValidationErrorKind::InvalidValue {
@@ -213,7 +210,6 @@ impl<'a> Validator<'a> {
                         format!("value too large (max: {})", max),
                     ));
                 }
-            }
         }
 
         result
@@ -255,8 +251,8 @@ impl<'a> Validator<'a> {
 
         // Apply constraints
         if let Some(c) = constraints {
-            if let Some(min) = c.min {
-                if parsed < min {
+            if let Some(min) = c.min
+                && parsed < min {
                     result.error(ValidationError::new(
                         path,
                         ValidationErrorKind::InvalidValue {
@@ -265,9 +261,8 @@ impl<'a> Validator<'a> {
                         format!("value too small (min: {})", min),
                     ));
                 }
-            }
-            if let Some(max) = c.max {
-                if parsed > max {
+            if let Some(max) = c.max
+                && parsed > max {
                     result.error(ValidationError::new(
                         path,
                         ValidationErrorKind::InvalidValue {
@@ -276,7 +271,6 @@ impl<'a> Validator<'a> {
                         format!("value too large (max: {})", max),
                     ));
                 }
-            }
         }
 
         result
@@ -585,14 +579,11 @@ impl<'a> Validator<'a> {
         };
 
         // Extract payload as a Value for recursive validation
-        let payload_value = match &value.payload {
-            None => None,
-            Some(p) => Some(Value {
+        let payload_value = value.payload.as_ref().map(|p| Value {
                 tag: None,
                 payload: Some(p.clone()),
                 span: None,
-            }),
-        };
+            });
 
         let expected_variants: Vec<String> = schema.0.keys().cloned().collect();
 
