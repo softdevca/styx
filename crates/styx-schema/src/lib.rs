@@ -35,8 +35,8 @@ mod tests {
         let result: Result<Schema, _> = facet_styx::from_str(source);
         tracing::trace!(?result, "parsed");
         let schema = result.unwrap();
-        assert!(matches!(schema, Schema::Type(_)));
-        if let Schema::Type(name) = schema {
+        assert!(matches!(schema, Schema::Type { .. }));
+        if let Schema::Type { name } = schema {
             assert_eq!(name, "string");
         }
     }
@@ -60,8 +60,8 @@ mod tests {
         if let Schema::Enum(e) = schema {
             let ok_schema = e.0.get("ok").expect("should have 'ok' variant");
             assert!(
-                matches!(ok_schema, Schema::Type(s) if s == "unit"),
-                "ok should be Type(\"unit\"), got {:?}",
+                matches!(ok_schema, Schema::Type { name } if name == "unit"),
+                "ok should be Type {{ name: \"unit\" }}, got {:?}",
                 ok_schema
             );
         }

@@ -63,9 +63,12 @@ pub enum Schema {
     Flatten(FlattenSchema),
 
     /// Type reference (any tag with unit payload, e.g., @string, @MyType).
-    /// The String contains the tag name. This is the fallback for unknown tags.
+    /// This is the fallback for unknown tags.
     #[facet(other)]
-    Type(String),
+    Type {
+        #[facet(tag)]
+        name: String,
+    },
 }
 
 /// Object schema: @object{field @Schema, @ @Schema}.
