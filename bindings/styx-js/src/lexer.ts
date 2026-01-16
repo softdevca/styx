@@ -250,6 +250,7 @@ export class Lexer {
         };
       }
       if (ch === "\\") {
+        const escapeStart = this.bytePos;
         this.advance();
         const escaped = this.advance();
         switch (escaped) {
@@ -262,9 +263,7 @@ export class Lexer {
           case "t":
             text += "\t";
             break;
-          case "0":
-            text += "\0";
-            break;
+
           case "\\":
             text += "\\";
             break;
@@ -275,8 +274,11 @@ export class Lexer {
             text += this.readUnicodeEscape();
             break;
           default:
-            // Unknown escape - keep as-is for now
-            text += "\\" + escaped;
+            // Unknown escape - this is a parse error
+            throw new ParseError(`invalid escape sequence: \\${escaped}`, {
+              start: escapeStart,
+              end: this.bytePos,
+            });
         }
       } else if (ch === "\n") {
         // Unclosed string at newline - recover by including the raw content
