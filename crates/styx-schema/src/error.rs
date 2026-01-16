@@ -1,6 +1,17 @@
 //! Validation error types.
 
+use ariadne::{Color, Config, Label, Report, ReportKind, Source};
 use styx_parse::Span;
+
+/// Get ariadne config, respecting NO_COLOR env var.
+fn ariadne_config() -> Config {
+    let no_color = std::env::var("NO_COLOR").is_ok();
+    if no_color {
+        Config::default().with_color(false)
+    } else {
+        Config::default()
+    }
+}
 
 /// Result of validating a document against a schema.
 #[derive(Debug, Clone)]
@@ -40,6 +51,29 @@ impl ValidationResult {
         self.errors.extend(other.errors);
         self.warnings.extend(other.warnings);
     }
+
+    /// Render all errors with ariadne.
+    pub fn render(&self, filename: &str, source: &str) -> String {
+        let mut output = Vec::new();
+        self.write_report(filename, source, &mut output);
+        String::from_utf8(output).unwrap_or_else(|_| {
+            self.errors
+                .iter()
+                .map(|e| e.to_string())
+                .collect::<Vec<_>>()
+                .join("\n")
+        })
+    }
+
+    /// Write all error reports to a writer.
+    pub fn write_report<W: std::io::Write>(&self, filename: &str, source: &str, mut writer: W) {
+        for error in &self.errors {
+            error.write_report(filename, source, &mut writer);
+        }
+        for warning in &self.warnings {
+            warning.write_report(filename, source, &mut writer);
+        }
+    }
 }
 
 /// A validation error.
@@ -75,6 +109,192 @@ impl ValidationError {
         self.span = span;
         self
     }
+
+    /// Render this error with ariadne.
+    pub fn render(&self, filename: &str, source: &str) -> String {
+        let mut output = Vec::new();
+        self.write_report(filename, source, &mut output);
+        String::from_utf8(output).unwrap_or_else(|_| format!("{}", self))
+    }
+
+    /// Write the error report to a writer.
+    pub fn write_report<W: std::io::Write>(&self, filename: &str, source: &str, writer: W) {
+        let report = self.build_report(filename);
+        let _ = report
+            .with_config(ariadne_config())
+            .finish()
+            .write((filename, Source::from(source)), writer);
+    }
+
+    /// Build an ariadne report for this error.
+    fn build_report<'a>(
+        &self,
+        filename: &'a str,
+    ) -> ariadne::ReportBuilder<'static, (&'a str, std::ops::Range<usize>)> {
+        let range = self
+            .span
+            .map(|s| s.start as usize..s.end as usize)
+            .unwrap_or(0..1);
+
+        let path_info = if self.path.is_empty() {
+            String::new()
+        } else {
+            format!(" at '{}'", self.path)
+        };
+
+        match &self.kind {
+            ValidationErrorKind::MissingField { field } => {
+                Report::build(ReportKind::Error, filename, range.start)
+                    .with_message(format!("missing required field '{}'", field))
+                    .with_label(
+                        Label::new((filename, range))
+                            .with_message(format!("add field '{}' here", field))
+                            .with_color(Color::Red),
+                    )
+                    .with_help(format!("{} <value>", field))
+            }
+
+            ValidationErrorKind::UnknownField {
+                field,
+                valid_fields,
+                suggestion,
+            } => {
+                let mut builder = Report::build(ReportKind::Error, filename, range.start)
+                    .with_message(format!("unknown field '{}'", field))
+                    .with_label(
+                        Label::new((filename, range.clone()))
+                            .with_message("not defined in schema")
+                            .with_color(Color::Red),
+                    );
+
+                if let Some(suggestion) = suggestion {
+                    builder = builder.with_help(format!("did you mean '{}'?", suggestion));
+                }
+
+                if !valid_fields.is_empty() {
+                    builder =
+                        builder.with_note(format!("valid fields: {}", valid_fields.join(", ")));
+                }
+
+                builder
+            }
+
+            ValidationErrorKind::TypeMismatch { expected, got } => {
+                Report::build(ReportKind::Error, filename, range.start)
+                    .with_message(format!("type mismatch{}", path_info))
+                    .with_label(
+                        Label::new((filename, range))
+                            .with_message(format!("expected {}, got {}", expected, got))
+                            .with_color(Color::Red),
+                    )
+            }
+
+            ValidationErrorKind::InvalidValue { reason } => {
+                Report::build(ReportKind::Error, filename, range.start)
+                    .with_message(format!("invalid value{}", path_info))
+                    .with_label(
+                        Label::new((filename, range))
+                            .with_message(reason)
+                            .with_color(Color::Red),
+                    )
+            }
+
+            ValidationErrorKind::UnknownType { name } => {
+                Report::build(ReportKind::Error, filename, range.start)
+                    .with_message(format!("unknown type '{}'", name))
+                    .with_label(
+                        Label::new((filename, range))
+                            .with_message("type not defined in schema")
+                            .with_color(Color::Red),
+                    )
+            }
+
+            ValidationErrorKind::InvalidVariant { expected, got } => {
+                let expected_list = expected.join(", ");
+                Report::build(ReportKind::Error, filename, range.start)
+                    .with_message(format!("invalid enum variant '@{}'", got))
+                    .with_label(
+                        Label::new((filename, range))
+                            .with_message(format!("expected one of: {}", expected_list))
+                            .with_color(Color::Red),
+                    )
+            }
+
+            ValidationErrorKind::UnionMismatch { tried } => {
+                let tried_list = tried.join(", ");
+                Report::build(ReportKind::Error, filename, range.start)
+                    .with_message(format!(
+                        "value doesn't match any union variant{}",
+                        path_info
+                    ))
+                    .with_label(
+                        Label::new((filename, range))
+                            .with_message(format!("tried: {}", tried_list))
+                            .with_color(Color::Red),
+                    )
+            }
+
+            ValidationErrorKind::ExpectedObject => {
+                Report::build(ReportKind::Error, filename, range.start)
+                    .with_message(format!("expected object{}", path_info))
+                    .with_label(
+                        Label::new((filename, range))
+                            .with_message("expected { ... }")
+                            .with_color(Color::Red),
+                    )
+            }
+
+            ValidationErrorKind::ExpectedSequence => {
+                Report::build(ReportKind::Error, filename, range.start)
+                    .with_message(format!("expected sequence{}", path_info))
+                    .with_label(
+                        Label::new((filename, range))
+                            .with_message("expected ( ... )")
+                            .with_color(Color::Red),
+                    )
+            }
+
+            ValidationErrorKind::ExpectedScalar => {
+                Report::build(ReportKind::Error, filename, range.start)
+                    .with_message(format!("expected scalar value{}", path_info))
+                    .with_label(
+                        Label::new((filename, range))
+                            .with_message("expected a simple value")
+                            .with_color(Color::Red),
+                    )
+            }
+
+            ValidationErrorKind::ExpectedTagged => {
+                Report::build(ReportKind::Error, filename, range.start)
+                    .with_message(format!("expected tagged value{}", path_info))
+                    .with_label(
+                        Label::new((filename, range))
+                            .with_message("expected @tag or @tag{...}")
+                            .with_color(Color::Red),
+                    )
+            }
+
+            ValidationErrorKind::WrongTag { expected, got } => {
+                Report::build(ReportKind::Error, filename, range.start)
+                    .with_message(format!("wrong tag{}", path_info))
+                    .with_label(
+                        Label::new((filename, range))
+                            .with_message(format!("expected @{}, got @{}", expected, got))
+                            .with_color(Color::Red),
+                    )
+            }
+
+            ValidationErrorKind::SchemaError { reason } => {
+                Report::build(ReportKind::Error, filename, range.start)
+                    .with_message("schema error")
+                    .with_label(
+                        Label::new((filename, range))
+                            .with_message(reason)
+                            .with_color(Color::Red),
+                    )
+            }
+        }
+    }
 }
 
 impl std::fmt::Display for ValidationError {
@@ -95,7 +315,11 @@ pub enum ValidationErrorKind {
     /// Missing required field in object.
     MissingField { field: String },
     /// Unknown field in object (when additional fields not allowed).
-    UnknownField { field: String },
+    UnknownField {
+        field: String,
+        valid_fields: Vec<String>,
+        suggestion: Option<String>,
+    },
     /// Type mismatch.
     TypeMismatch { expected: String, got: String },
     /// Invalid value for type.
@@ -146,6 +370,46 @@ impl ValidationWarning {
             kind,
             message: message.into(),
         }
+    }
+
+    /// Set the span.
+    pub fn with_span(mut self, span: Option<Span>) -> Self {
+        self.span = span;
+        self
+    }
+
+    /// Write the warning report to a writer.
+    pub fn write_report<W: std::io::Write>(&self, filename: &str, source: &str, writer: W) {
+        let range = self
+            .span
+            .map(|s| s.start as usize..s.end as usize)
+            .unwrap_or(0..1);
+
+        let report = match &self.kind {
+            ValidationWarningKind::Deprecated { reason } => {
+                Report::build(ReportKind::Warning, filename, range.start)
+                    .with_message("deprecated")
+                    .with_label(
+                        Label::new((filename, range))
+                            .with_message(reason)
+                            .with_color(Color::Yellow),
+                    )
+            }
+            ValidationWarningKind::IgnoredField { field } => {
+                Report::build(ReportKind::Warning, filename, range.start)
+                    .with_message(format!("field '{}' will be ignored", field))
+                    .with_label(
+                        Label::new((filename, range))
+                            .with_message("ignored")
+                            .with_color(Color::Yellow),
+                    )
+            }
+        };
+
+        let _ = report
+            .with_config(ariadne_config())
+            .finish()
+            .write((filename, Source::from(source)), writer);
     }
 }
 

@@ -6,6 +6,54 @@ use std::collections::HashSet;
 
 use styx_tree::{Payload, Value};
 
+/// Compute Levenshtein distance between two strings.
+fn levenshtein(a: &str, b: &str) -> usize {
+    let a_len = a.chars().count();
+    let b_len = b.chars().count();
+
+    if a_len == 0 {
+        return b_len;
+    }
+    if b_len == 0 {
+        return a_len;
+    }
+
+    let mut prev_row: Vec<usize> = (0..=b_len).collect();
+    let mut curr_row = vec![0; b_len + 1];
+
+    for (i, a_char) in a.chars().enumerate() {
+        curr_row[0] = i + 1;
+        for (j, b_char) in b.chars().enumerate() {
+            let cost = if a_char == b_char { 0 } else { 1 };
+            curr_row[j + 1] = (prev_row[j + 1] + 1)
+                .min(curr_row[j] + 1)
+                .min(prev_row[j] + cost);
+        }
+        std::mem::swap(&mut prev_row, &mut curr_row);
+    }
+
+    prev_row[b_len]
+}
+
+/// Find the most similar string from a list, if one is close enough.
+fn suggest_similar<'a>(unknown: &str, valid: &'a [String]) -> Option<&'a str> {
+    let unknown_lower = unknown.to_lowercase();
+    valid
+        .iter()
+        .filter_map(|v| {
+            let v_lower = v.to_lowercase();
+            let dist = levenshtein(&unknown_lower, &v_lower);
+            // Only suggest if edit distance is at most 2 and less than half the length
+            if dist <= 2 && dist < unknown.len().max(1) {
+                Some((v.as_str(), dist))
+            } else {
+                None
+            }
+        })
+        .min_by_key(|(_, d)| *d)
+        .map(|(v, _)| v)
+}
+
 use crate::error::{
     ValidationError, ValidationErrorKind, ValidationResult, ValidationWarning,
     ValidationWarningKind,
@@ -35,13 +83,16 @@ impl<'a> Validator<'a> {
             Some(root_schema) => self.validate_value(doc, root_schema, ""),
             None => {
                 let mut result = ValidationResult::ok();
-                result.error(ValidationError::new(
-                    "",
-                    ValidationErrorKind::SchemaError {
-                        reason: "no root type (@) defined in schema".into(),
-                    },
-                    "schema has no root type definition",
-                ));
+                result.error(
+                    ValidationError::new(
+                        "",
+                        ValidationErrorKind::SchemaError {
+                            reason: "no root type (@) defined in schema".into(),
+                        },
+                        "schema has no root type definition",
+                    )
+                    .with_span(doc.span),
+                );
                 result
             }
         }
@@ -53,13 +104,16 @@ impl<'a> Validator<'a> {
             Some(schema) => self.validate_value(value, schema, ""),
             None => {
                 let mut result = ValidationResult::ok();
-                result.error(ValidationError::new(
-                    "",
-                    ValidationErrorKind::UnknownType {
-                        name: type_name.into(),
-                    },
-                    format!("unknown type '{type_name}'"),
-                ));
+                result.error(
+                    ValidationError::new(
+                        "",
+                        ValidationErrorKind::UnknownType {
+                            name: type_name.into(),
+                        },
+                        format!("unknown type '{type_name}'"),
+                    )
+                    .with_span(value.span),
+                );
                 result
             }
         }
@@ -114,11 +168,14 @@ impl<'a> Validator<'a> {
         let text = match value.scalar_text() {
             Some(t) => t,
             None => {
-                result.error(ValidationError::new(
-                    path,
-                    ValidationErrorKind::ExpectedScalar,
-                    format!("expected string, got {}", value_type_name(value)),
-                ));
+                result.error(
+                    ValidationError::new(
+                        path,
+                        ValidationErrorKind::ExpectedScalar,
+                        format!("expected string, got {}", value_type_name(value)),
+                    )
+                    .with_span(value.span),
+                );
                 return result;
             }
         };
@@ -126,25 +183,33 @@ impl<'a> Validator<'a> {
         // Apply constraints if present
         if let Some(c) = constraints {
             if let Some(min) = c.min_len
-                && text.len() < min {
-                    result.error(ValidationError::new(
+                && text.len() < min
+            {
+                result.error(
+                    ValidationError::new(
                         path,
                         ValidationErrorKind::InvalidValue {
                             reason: format!("string length {} < minimum {}", text.len(), min),
                         },
                         format!("string too short (min length: {})", min),
-                    ));
-                }
+                    )
+                    .with_span(value.span),
+                );
+            }
             if let Some(max) = c.max_len
-                && text.len() > max {
-                    result.error(ValidationError::new(
+                && text.len() > max
+            {
+                result.error(
+                    ValidationError::new(
                         path,
                         ValidationErrorKind::InvalidValue {
                             reason: format!("string length {} > maximum {}", text.len(), max),
                         },
                         format!("string too long (max length: {})", max),
-                    ));
-                }
+                    )
+                    .with_span(value.span),
+                );
+            }
             if let Some(pattern) = &c.pattern {
                 // TODO: compile and match regex
                 let _ = pattern; // Suppress unused warning for now
@@ -165,11 +230,14 @@ impl<'a> Validator<'a> {
         let text = match value.scalar_text() {
             Some(t) => t,
             None => {
-                result.error(ValidationError::new(
-                    path,
-                    ValidationErrorKind::ExpectedScalar,
-                    format!("expected integer, got {}", value_type_name(value)),
-                ));
+                result.error(
+                    ValidationError::new(
+                        path,
+                        ValidationErrorKind::ExpectedScalar,
+                        format!("expected integer, got {}", value_type_name(value)),
+                    )
+                    .with_span(value.span),
+                );
                 return result;
             }
         };
@@ -177,13 +245,16 @@ impl<'a> Validator<'a> {
         let parsed = match text.parse::<i128>() {
             Ok(n) => n,
             Err(_) => {
-                result.error(ValidationError::new(
-                    path,
-                    ValidationErrorKind::InvalidValue {
-                        reason: "not a valid integer".into(),
-                    },
-                    format!("'{}' is not a valid integer", text),
-                ));
+                result.error(
+                    ValidationError::new(
+                        path,
+                        ValidationErrorKind::InvalidValue {
+                            reason: "not a valid integer".into(),
+                        },
+                        format!("'{}' is not a valid integer", text),
+                    )
+                    .with_span(value.span),
+                );
                 return result;
             }
         };
@@ -191,25 +262,33 @@ impl<'a> Validator<'a> {
         // Apply constraints
         if let Some(c) = constraints {
             if let Some(min) = c.min
-                && parsed < min {
-                    result.error(ValidationError::new(
+                && parsed < min
+            {
+                result.error(
+                    ValidationError::new(
                         path,
                         ValidationErrorKind::InvalidValue {
                             reason: format!("value {} < minimum {}", parsed, min),
                         },
                         format!("value too small (min: {})", min),
-                    ));
-                }
+                    )
+                    .with_span(value.span),
+                );
+            }
             if let Some(max) = c.max
-                && parsed > max {
-                    result.error(ValidationError::new(
+                && parsed > max
+            {
+                result.error(
+                    ValidationError::new(
                         path,
                         ValidationErrorKind::InvalidValue {
                             reason: format!("value {} > maximum {}", parsed, max),
                         },
                         format!("value too large (max: {})", max),
-                    ));
-                }
+                    )
+                    .with_span(value.span),
+                );
+            }
         }
 
         result
@@ -226,11 +305,14 @@ impl<'a> Validator<'a> {
         let text = match value.scalar_text() {
             Some(t) => t,
             None => {
-                result.error(ValidationError::new(
-                    path,
-                    ValidationErrorKind::ExpectedScalar,
-                    format!("expected number, got {}", value_type_name(value)),
-                ));
+                result.error(
+                    ValidationError::new(
+                        path,
+                        ValidationErrorKind::ExpectedScalar,
+                        format!("expected number, got {}", value_type_name(value)),
+                    )
+                    .with_span(value.span),
+                );
                 return result;
             }
         };
@@ -238,13 +320,16 @@ impl<'a> Validator<'a> {
         let parsed = match text.parse::<f64>() {
             Ok(n) => n,
             Err(_) => {
-                result.error(ValidationError::new(
-                    path,
-                    ValidationErrorKind::InvalidValue {
-                        reason: "not a valid number".into(),
-                    },
-                    format!("'{}' is not a valid number", text),
-                ));
+                result.error(
+                    ValidationError::new(
+                        path,
+                        ValidationErrorKind::InvalidValue {
+                            reason: "not a valid number".into(),
+                        },
+                        format!("'{}' is not a valid number", text),
+                    )
+                    .with_span(value.span),
+                );
                 return result;
             }
         };
@@ -252,25 +337,33 @@ impl<'a> Validator<'a> {
         // Apply constraints
         if let Some(c) = constraints {
             if let Some(min) = c.min
-                && parsed < min {
-                    result.error(ValidationError::new(
+                && parsed < min
+            {
+                result.error(
+                    ValidationError::new(
                         path,
                         ValidationErrorKind::InvalidValue {
                             reason: format!("value {} < minimum {}", parsed, min),
                         },
                         format!("value too small (min: {})", min),
-                    ));
-                }
+                    )
+                    .with_span(value.span),
+                );
+            }
             if let Some(max) = c.max
-                && parsed > max {
-                    result.error(ValidationError::new(
+                && parsed > max
+            {
+                result.error(
+                    ValidationError::new(
                         path,
                         ValidationErrorKind::InvalidValue {
                             reason: format!("value {} > maximum {}", parsed, max),
                         },
                         format!("value too large (max: {})", max),
-                    ));
-                }
+                    )
+                    .with_span(value.span),
+                );
+            }
         }
 
         result
@@ -282,20 +375,26 @@ impl<'a> Validator<'a> {
         match value.scalar_text() {
             Some(text) if text == "true" || text == "false" => {}
             Some(text) => {
-                result.error(ValidationError::new(
-                    path,
-                    ValidationErrorKind::InvalidValue {
-                        reason: "not a valid boolean".into(),
-                    },
-                    format!("'{}' is not a valid boolean (expected true/false)", text),
-                ));
+                result.error(
+                    ValidationError::new(
+                        path,
+                        ValidationErrorKind::InvalidValue {
+                            reason: "not a valid boolean".into(),
+                        },
+                        format!("'{}' is not a valid boolean (expected true/false)", text),
+                    )
+                    .with_span(value.span),
+                );
             }
             None => {
-                result.error(ValidationError::new(
-                    path,
-                    ValidationErrorKind::ExpectedScalar,
-                    format!("expected boolean, got {}", value_type_name(value)),
-                ));
+                result.error(
+                    ValidationError::new(
+                        path,
+                        ValidationErrorKind::ExpectedScalar,
+                        format!("expected boolean, got {}", value_type_name(value)),
+                    )
+                    .with_span(value.span),
+                );
             }
         }
 
@@ -306,14 +405,17 @@ impl<'a> Validator<'a> {
         let mut result = ValidationResult::ok();
 
         if !value.is_unit() {
-            result.error(ValidationError::new(
-                path,
-                ValidationErrorKind::TypeMismatch {
-                    expected: "unit".into(),
-                    got: value_type_name(value).into(),
-                },
-                "expected unit value",
-            ));
+            result.error(
+                ValidationError::new(
+                    path,
+                    ValidationErrorKind::TypeMismatch {
+                        expected: "unit".into(),
+                        got: value_type_name(value).into(),
+                    },
+                    "expected unit value",
+                )
+                .with_span(value.span),
+            );
         }
 
         result
@@ -334,11 +436,14 @@ impl<'a> Validator<'a> {
         let obj = match value.as_object() {
             Some(o) => o,
             None => {
-                result.error(ValidationError::new(
-                    path,
-                    ValidationErrorKind::ExpectedObject,
-                    format!("expected object, got {}", value_type_name(value)),
-                ));
+                result.error(
+                    ValidationError::new(
+                        path,
+                        ValidationErrorKind::ExpectedObject,
+                        format!("expected object, got {}", value_type_name(value)),
+                    )
+                    .with_span(value.span),
+                );
                 return result;
             }
         };
@@ -352,13 +457,16 @@ impl<'a> Validator<'a> {
             } else if let Some(s) = entry.key.as_str() {
                 Some(s)
             } else {
-                result.error(ValidationError::new(
-                    path,
-                    ValidationErrorKind::InvalidValue {
-                        reason: "object keys must be scalars or unit".into(),
-                    },
-                    "invalid object key",
-                ));
+                result.error(
+                    ValidationError::new(
+                        path,
+                        ValidationErrorKind::InvalidValue {
+                            reason: "object keys must be scalars or unit".into(),
+                        },
+                        "invalid object key",
+                    )
+                    .with_span(entry.key.span),
+                );
                 continue;
             };
 
@@ -378,13 +486,24 @@ impl<'a> Validator<'a> {
             } else if let Some(add_schema) = additional_schema {
                 result.merge(self.validate_value(&entry.value, add_schema, &field_path));
             } else {
-                result.error(ValidationError::new(
-                    &field_path,
-                    ValidationErrorKind::UnknownField {
-                        field: key_display.into(),
-                    },
-                    format!("unknown field '{key_display}'"),
-                ));
+                // Collect valid field names for error message
+                let valid_fields: Vec<String> = schema.0.keys().filter_map(|k| k.clone()).collect();
+
+                // Try to find a similar field name (typo detection)
+                let suggestion = suggest_similar(key_display, &valid_fields).map(String::from);
+
+                result.error(
+                    ValidationError::new(
+                        &field_path,
+                        ValidationErrorKind::UnknownField {
+                            field: key_display.into(),
+                            valid_fields,
+                            suggestion,
+                        },
+                        format!("unknown field '{key_display}'"),
+                    )
+                    .with_span(entry.key.span),
+                );
             }
         }
 
@@ -403,13 +522,16 @@ impl<'a> Validator<'a> {
                     } else {
                         format!("{path}.{name}")
                     };
-                    result.error(ValidationError::new(
-                        &field_path,
-                        ValidationErrorKind::MissingField {
-                            field: name.clone(),
-                        },
-                        format!("missing required field '{name}'"),
-                    ));
+                    result.error(
+                        ValidationError::new(
+                            &field_path,
+                            ValidationErrorKind::MissingField {
+                                field: name.clone(),
+                            },
+                            format!("missing required field '{name}'"),
+                        )
+                        .with_span(value.span),
+                    );
                 }
             }
         }
@@ -423,11 +545,14 @@ impl<'a> Validator<'a> {
         let seq = match value.as_sequence() {
             Some(s) => s,
             None => {
-                result.error(ValidationError::new(
-                    path,
-                    ValidationErrorKind::ExpectedSequence,
-                    format!("expected sequence, got {}", value_type_name(value)),
-                ));
+                result.error(
+                    ValidationError::new(
+                        path,
+                        ValidationErrorKind::ExpectedSequence,
+                        format!("expected sequence, got {}", value_type_name(value)),
+                    )
+                    .with_span(value.span),
+                );
                 return result;
             }
         };
@@ -448,11 +573,14 @@ impl<'a> Validator<'a> {
         let obj = match value.as_object() {
             Some(o) => o,
             None => {
-                result.error(ValidationError::new(
-                    path,
-                    ValidationErrorKind::ExpectedObject,
-                    format!("expected map (object), got {}", value_type_name(value)),
-                ));
+                result.error(
+                    ValidationError::new(
+                        path,
+                        ValidationErrorKind::ExpectedObject,
+                        format!("expected map (object), got {}", value_type_name(value)),
+                    )
+                    .with_span(value.span),
+                );
                 return result;
             }
         };
@@ -462,13 +590,16 @@ impl<'a> Validator<'a> {
             1 => (None, &schema.0[0]),
             2 => (Some(&schema.0[0]), &schema.0[1]),
             n => {
-                result.error(ValidationError::new(
-                    path,
-                    ValidationErrorKind::SchemaError {
-                        reason: format!("map schema must have 1 or 2 types, got {}", n),
-                    },
-                    "invalid map schema",
-                ));
+                result.error(
+                    ValidationError::new(
+                        path,
+                        ValidationErrorKind::SchemaError {
+                            reason: format!("map schema must have 1 or 2 types, got {}", n),
+                        },
+                        "invalid map schema",
+                    )
+                    .with_span(value.span),
+                );
                 return result;
             }
         };
@@ -477,13 +608,16 @@ impl<'a> Validator<'a> {
             let key_str = match entry.key.as_str() {
                 Some(s) => s,
                 None => {
-                    result.error(ValidationError::new(
-                        path,
-                        ValidationErrorKind::InvalidValue {
-                            reason: "map keys must be scalars".into(),
-                        },
-                        "invalid map key",
-                    ));
+                    result.error(
+                        ValidationError::new(
+                            path,
+                            ValidationErrorKind::InvalidValue {
+                                reason: "map keys must be scalars".into(),
+                            },
+                            "invalid map key",
+                        )
+                        .with_span(entry.key.span),
+                    );
                     continue;
                 }
             };
@@ -513,13 +647,16 @@ impl<'a> Validator<'a> {
         let mut result = ValidationResult::ok();
 
         if schema.0.is_empty() {
-            result.error(ValidationError::new(
-                path,
-                ValidationErrorKind::SchemaError {
-                    reason: "union must have at least one variant".into(),
-                },
-                "invalid union schema: no variants",
-            ));
+            result.error(
+                ValidationError::new(
+                    path,
+                    ValidationErrorKind::SchemaError {
+                        reason: "union must have at least one variant".into(),
+                    },
+                    "invalid union schema: no variants",
+                )
+                .with_span(value.span),
+            );
             return result;
         }
 
@@ -532,19 +669,22 @@ impl<'a> Validator<'a> {
             tried.push(schema_type_name(variant));
         }
 
-        result.error(ValidationError::new(
-            path,
-            ValidationErrorKind::UnionMismatch { tried },
-            format!(
-                "value doesn't match any union variant (tried: {})",
-                schema
-                    .0
-                    .iter()
-                    .map(schema_type_name)
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            ),
-        ));
+        result.error(
+            ValidationError::new(
+                path,
+                ValidationErrorKind::UnionMismatch { tried },
+                format!(
+                    "value doesn't match any union variant (tried: {})",
+                    schema
+                        .0
+                        .iter()
+                        .map(schema_type_name)
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                ),
+            )
+            .with_span(value.span),
+        );
 
         result
     }
@@ -566,24 +706,27 @@ impl<'a> Validator<'a> {
         let tag = match &value.tag {
             Some(t) => t.name.as_str(),
             None => {
-                result.error(ValidationError::new(
-                    path,
-                    ValidationErrorKind::ExpectedTagged,
-                    format!(
-                        "expected tagged value for enum, got {}",
-                        value_type_name(value)
-                    ),
-                ));
+                result.error(
+                    ValidationError::new(
+                        path,
+                        ValidationErrorKind::ExpectedTagged,
+                        format!(
+                            "expected tagged value for enum, got {}",
+                            value_type_name(value)
+                        ),
+                    )
+                    .with_span(value.span),
+                );
                 return result;
             }
         };
 
         // Extract payload as a Value for recursive validation
         let payload_value = value.payload.as_ref().map(|p| Value {
-                tag: None,
-                payload: Some(p.clone()),
-                span: None,
-            });
+            tag: None,
+            payload: Some(p.clone()),
+            span: None,
+        });
 
         let expected_variants: Vec<String> = schema.0.keys().cloned().collect();
 
@@ -608,29 +751,35 @@ impl<'a> Validator<'a> {
                         result.merge(self.validate_value(p, variant_schema, &variant_path));
                     }
                     (None, _) => {
-                        result.error(ValidationError::new(
-                            path,
-                            ValidationErrorKind::TypeMismatch {
-                                expected: schema_type_name(variant_schema),
-                                got: "unit".into(),
-                            },
-                            format!("variant '{tag}' requires a payload"),
-                        ));
+                        result.error(
+                            ValidationError::new(
+                                path,
+                                ValidationErrorKind::TypeMismatch {
+                                    expected: schema_type_name(variant_schema),
+                                    got: "unit".into(),
+                                },
+                                format!("variant '{tag}' requires a payload"),
+                            )
+                            .with_span(value.span),
+                        );
                     }
                 }
             }
             None => {
-                result.error(ValidationError::new(
-                    path,
-                    ValidationErrorKind::InvalidVariant {
-                        expected: expected_variants,
-                        got: tag.into(),
-                    },
-                    format!(
-                        "unknown enum variant '{tag}' (expected one of: {})",
-                        schema.0.keys().cloned().collect::<Vec<_>>().join(", ")
-                    ),
-                ));
+                result.error(
+                    ValidationError::new(
+                        path,
+                        ValidationErrorKind::InvalidVariant {
+                            expected: expected_variants,
+                            got: tag.into(),
+                        },
+                        format!(
+                            "unknown enum variant '{tag}' (expected one of: {})",
+                            schema.0.keys().cloned().collect::<Vec<_>>().join(", ")
+                        ),
+                    )
+                    .with_span(value.span),
+                );
             }
         }
 
@@ -672,13 +821,16 @@ impl<'a> Validator<'a> {
         let mut result = self.validate_value(value, inner, path);
 
         // Add deprecation warning
-        result.warning(ValidationWarning::new(
-            path,
-            ValidationWarningKind::Deprecated {
-                reason: reason.clone(),
-            },
-            format!("deprecated: {}", reason),
-        ));
+        result.warning(
+            ValidationWarning::new(
+                path,
+                ValidationWarningKind::Deprecated {
+                    reason: reason.clone(),
+                },
+                format!("deprecated: {}", reason),
+            )
+            .with_span(value.span),
+        );
 
         result
     }
@@ -693,20 +845,26 @@ impl<'a> Validator<'a> {
         match value.scalar_text() {
             Some(text) if text == expected => {}
             Some(text) => {
-                result.error(ValidationError::new(
-                    path,
-                    ValidationErrorKind::InvalidValue {
-                        reason: format!("expected literal '{expected}', got '{}'", text),
-                    },
-                    format!("expected '{expected}', got '{}'", text),
-                ));
+                result.error(
+                    ValidationError::new(
+                        path,
+                        ValidationErrorKind::InvalidValue {
+                            reason: format!("expected literal '{expected}', got '{}'", text),
+                        },
+                        format!("expected '{expected}', got '{}'", text),
+                    )
+                    .with_span(value.span),
+                );
             }
             None => {
-                result.error(ValidationError::new(
-                    path,
-                    ValidationErrorKind::ExpectedScalar,
-                    format!("expected literal '{expected}', got non-scalar"),
-                ));
+                result.error(
+                    ValidationError::new(
+                        path,
+                        ValidationErrorKind::ExpectedScalar,
+                        format!("expected literal '{expected}', got non-scalar"),
+                    )
+                    .with_span(value.span),
+                );
             }
         }
 
@@ -725,14 +883,17 @@ impl<'a> Validator<'a> {
             None => {
                 // Unit type reference (@)
                 if !value.is_unit() {
-                    result.error(ValidationError::new(
-                        path,
-                        ValidationErrorKind::TypeMismatch {
-                            expected: "unit".into(),
-                            got: value_type_name(value).into(),
-                        },
-                        "expected unit value",
-                    ));
+                    result.error(
+                        ValidationError::new(
+                            path,
+                            ValidationErrorKind::TypeMismatch {
+                                expected: "unit".into(),
+                                got: value_type_name(value).into(),
+                            },
+                            "expected unit value",
+                        )
+                        .with_span(value.span),
+                    );
                 }
             }
             Some(name) => {
@@ -740,11 +901,14 @@ impl<'a> Validator<'a> {
                 if let Some(type_schema) = self.schema_file.schema.get(&Some(name.to_string())) {
                     result.merge(self.validate_value(value, type_schema, path));
                 } else {
-                    result.error(ValidationError::new(
-                        path,
-                        ValidationErrorKind::UnknownType { name: name.into() },
-                        format!("unknown type '{name}'"),
-                    ));
+                    result.error(
+                        ValidationError::new(
+                            path,
+                            ValidationErrorKind::UnknownType { name: name.into() },
+                            format!("unknown type '{name}'"),
+                        )
+                        .with_span(value.span),
+                    );
                 }
             }
         }

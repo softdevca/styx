@@ -122,7 +122,7 @@ fn test_validate_unknown_field() {
     assert!(!result.is_valid());
     assert!(result.errors.iter().any(|e| matches!(
         &e.kind,
-        ValidationErrorKind::UnknownField { field } if field == "age"
+        ValidationErrorKind::UnknownField { field, .. } if field == "age"
     )));
 }
 

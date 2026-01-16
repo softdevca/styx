@@ -13,6 +13,9 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/bearcove/styx"
 
 [workspace.dependencies]
+# Error reporting
+ariadne = "0.4"
+
 # Facet crates
 facet = "0.42"
 facet-args = "0.42"
