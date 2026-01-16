@@ -116,17 +116,13 @@ impl ValidationError {
         match &self.kind {
             ValidationErrorKind::UnknownField {
                 field, suggestion, ..
-            } => {
-                if let Some(suggestion) = suggestion {
-                    Some(serde_json::json!({
-                        "type": "rename_field",
-                        "from": field,
-                        "to": suggestion
-                    }))
-                } else {
-                    None
-                }
-            }
+            } => suggestion.as_ref().map(|suggestion| {
+                serde_json::json!({
+                    "type": "rename_field",
+                    "from": field,
+                    "to": suggestion
+                })
+            }),
             _ => None,
         }
     }
