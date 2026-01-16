@@ -1,0 +1,25 @@
+{
+  "name": "styx-lang",
+  "version": "0.1.0",
+  "description": "Styx configuration language parser",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "node --test dist/*.test.js",
+    "compliance": "node dist/compliance.js ../../compliance/corpus"
+  },
+  "keywords": ["styx", "config", "parser", "configuration"],
+  "license": "MIT OR Apache-2.0",
+  "devDependencies": {
+    "typescript": "^5.3.0",
+    "@types/node": "^20.0.0"
+  }
+}
