@@ -1,0 +1,12 @@
+{
+  "": {
+    "swift-dependencies": "/Users/amos/bearcove/styx/implementations/styx-swift/.build/arm64-apple-macosx/debug/StyxCompliance.build/master.swiftdeps"
+  },
+  "/Users/amos/bearcove/styx/implementations/styx-swift/Sources/StyxCompliance/main.swift": {
+    "dependencies": "/Users/amos/bearcove/styx/implementations/styx-swift/.build/arm64-apple-macosx/debug/StyxCompliance.build/main.d",
+    "object": "/Users/amos/bearcove/styx/implementations/styx-swift/.build/arm64-apple-macosx/debug/StyxCompliance.build/main.swift.o",
+    "swiftmodule": "/Users/amos/bearcove/styx/implementations/styx-swift/.build/arm64-apple-macosx/debug/StyxCompliance.build/main~partial.swiftmodule",
+    "swift-dependencies": "/Users/amos/bearcove/styx/implementations/styx-swift/.build/arm64-apple-macosx/debug/StyxCompliance.build/main.swiftdeps",
+    "diagnostics": "/Users/amos/bearcove/styx/implementations/styx-swift/.build/arm64-apple-macosx/debug/StyxCompliance.build/main.dia"
+  }
+}

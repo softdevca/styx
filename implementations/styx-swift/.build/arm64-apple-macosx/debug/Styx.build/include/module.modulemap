@@ -1,0 +1,3 @@
+module Styx {
+    header "/Users/amos/bearcove/styx/implementations/styx-swift/.build/arm64-apple-macosx/debug/Styx.build/include/Styx-Swift.h"
+}
