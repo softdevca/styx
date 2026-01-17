@@ -26,7 +26,7 @@ export interface Token {
   hadNewlineBefore: boolean;
 }
 
-const SPECIAL_CHARS = new Set(["{", "}", "(", ")", ",", '"', ">", "@", " ", "\t", "\n", "\r"]);
+const SPECIAL_CHARS = new Set(["{", "}", "(", ")", ",", '"', ">", " ", "\t", "\n", "\r"]);
 
 export class Lexer {
   private pos = 0; // character position
