@@ -14,7 +14,7 @@ repository = "https://github.com/bearcove/styx"
 
 [workspace.dependencies]
 # Error reporting
-ariadne = "0.4"
+ariadne = "0.6"
 
 # Facet crates
 facet = "0.42"

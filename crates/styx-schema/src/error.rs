@@ -188,7 +188,7 @@ impl ValidationError {
 
         match &self.kind {
             ValidationErrorKind::MissingField { field } => {
-                Report::build(ReportKind::Error, filename, range.start)
+                Report::build(ReportKind::Error, (filename, range.clone()))
                     .with_message(format!("missing required field '{}'", field))
                     .with_label(
                         Label::new((filename, range))
@@ -203,7 +203,7 @@ impl ValidationError {
                 valid_fields,
                 suggestion,
             } => {
-                let mut builder = Report::build(ReportKind::Error, filename, range.start)
+                let mut builder = Report::build(ReportKind::Error, (filename, range.clone()))
                     .with_message(format!("unknown field '{}'", field))
                     .with_label(
                         Label::new((filename, range.clone()))
@@ -224,7 +224,7 @@ impl ValidationError {
             }
 
             ValidationErrorKind::TypeMismatch { expected, got } => {
-                Report::build(ReportKind::Error, filename, range.start)
+                Report::build(ReportKind::Error, (filename, range.clone()))
                     .with_message(format!("type mismatch{}", path_info))
                     .with_label(
                         Label::new((filename, range))
@@ -234,7 +234,7 @@ impl ValidationError {
             }
 
             ValidationErrorKind::InvalidValue { reason } => {
-                Report::build(ReportKind::Error, filename, range.start)
+                Report::build(ReportKind::Error, (filename, range.clone()))
                     .with_message(format!("invalid value{}", path_info))
                     .with_label(
                         Label::new((filename, range))
@@ -244,7 +244,7 @@ impl ValidationError {
             }
 
             ValidationErrorKind::UnknownType { name } => {
-                Report::build(ReportKind::Error, filename, range.start)
+                Report::build(ReportKind::Error, (filename, range.clone()))
                     .with_message(format!("unknown type '{}'", name))
                     .with_label(
                         Label::new((filename, range))
@@ -255,7 +255,7 @@ impl ValidationError {
 
             ValidationErrorKind::InvalidVariant { expected, got } => {
                 let expected_list = expected.join(", ");
-                Report::build(ReportKind::Error, filename, range.start)
+                Report::build(ReportKind::Error, (filename, range.clone()))
                     .with_message(format!("invalid enum variant '@{}'", got))
                     .with_label(
                         Label::new((filename, range))
@@ -266,7 +266,7 @@ impl ValidationError {
 
             ValidationErrorKind::UnionMismatch { tried } => {
                 let tried_list = tried.join(", ");
-                Report::build(ReportKind::Error, filename, range.start)
+                Report::build(ReportKind::Error, (filename, range.clone()))
                     .with_message(format!(
                         "value doesn't match any union variant{}",
                         path_info
@@ -279,7 +279,7 @@ impl ValidationError {
             }
 
             ValidationErrorKind::ExpectedObject => {
-                Report::build(ReportKind::Error, filename, range.start)
+                Report::build(ReportKind::Error, (filename, range.clone()))
                     .with_message(format!("expected object{}", path_info))
                     .with_label(
                         Label::new((filename, range))
@@ -289,7 +289,7 @@ impl ValidationError {
             }
 
             ValidationErrorKind::ExpectedSequence => {
-                Report::build(ReportKind::Error, filename, range.start)
+                Report::build(ReportKind::Error, (filename, range.clone()))
                     .with_message(format!("expected sequence{}", path_info))
                     .with_label(
                         Label::new((filename, range))
@@ -299,7 +299,7 @@ impl ValidationError {
             }
 
             ValidationErrorKind::ExpectedScalar => {
-                Report::build(ReportKind::Error, filename, range.start)
+                Report::build(ReportKind::Error, (filename, range.clone()))
                     .with_message(format!("expected scalar value{}", path_info))
                     .with_label(
                         Label::new((filename, range))
@@ -309,7 +309,7 @@ impl ValidationError {
             }
 
             ValidationErrorKind::ExpectedTagged => {
-                Report::build(ReportKind::Error, filename, range.start)
+                Report::build(ReportKind::Error, (filename, range.clone()))
                     .with_message(format!("expected tagged value{}", path_info))
                     .with_label(
                         Label::new((filename, range))
@@ -319,7 +319,7 @@ impl ValidationError {
             }
 
             ValidationErrorKind::WrongTag { expected, got } => {
-                Report::build(ReportKind::Error, filename, range.start)
+                Report::build(ReportKind::Error, (filename, range.clone()))
                     .with_message(format!("wrong tag{}", path_info))
                     .with_label(
                         Label::new((filename, range))
@@ -329,7 +329,7 @@ impl ValidationError {
             }
 
             ValidationErrorKind::SchemaError { reason } => {
-                Report::build(ReportKind::Error, filename, range.start)
+                Report::build(ReportKind::Error, (filename, range.clone()))
                     .with_message("schema error")
                     .with_label(
                         Label::new((filename, range))
@@ -431,7 +431,7 @@ impl ValidationWarning {
 
         let report = match &self.kind {
             ValidationWarningKind::Deprecated { reason } => {
-                Report::build(ReportKind::Warning, filename, range.start)
+                Report::build(ReportKind::Warning, (filename, range.clone()))
                     .with_message("deprecated")
                     .with_label(
                         Label::new((filename, range))
@@ -440,7 +440,7 @@ impl ValidationWarning {
                     )
             }
             ValidationWarningKind::IgnoredField { field } => {
-                Report::build(ReportKind::Warning, filename, range.start)
+                Report::build(ReportKind::Warning, (filename, range.clone()))
                     .with_message(format!("field '{}' will be ignored", field))
                     .with_label(
                         Label::new((filename, range))
