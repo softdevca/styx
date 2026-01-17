@@ -163,3 +163,50 @@ jobs:
 
       - name: Compare with golden
         run: diff -u ../../compliance/golden.sexp output.sexp
+
+  go-lint:
+    name: Go / Lint
+    runs-on: depot-ubuntu-24.04-4
+    defaults:
+      run:
+        working-directory: implementations/styx-go
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache-dependency-path: implementations/styx-go/go.sum
+
+      - name: Run go vet
+        run: go vet ./...
+
+      - name: Run staticcheck
+        run: |
+          go install honnef.co/go/tools/cmd/staticcheck@latest
+          staticcheck ./...
+
+  compliance-go:
+    name: Compliance / Go
+    runs-on: depot-ubuntu-24.04-4
+    defaults:
+      run:
+        working-directory: implementations/styx-go
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache-dependency-path: implementations/styx-go/go.sum
+
+      - name: Build compliance runner
+        run: go build ./cmd/styx-compliance
+
+      - name: Run compliance suite
+        run: ./styx-compliance ../../compliance/corpus > output.sexp
+
+      - name: Compare with golden
+        run: diff -u ../../compliance/golden.sexp output.sexp
