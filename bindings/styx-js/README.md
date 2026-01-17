@@ -21,7 +21,7 @@ const doc = parse(`
   
   server {
     host localhost
-    tls @true
+    tls true
   }
   
   routes (
