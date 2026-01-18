@@ -49,3 +49,7 @@ facet-args = { git = "https://github.com/facet-rs/facet" }
 facet-core = { git = "https://github.com/facet-rs/facet" }
 facet-format = { git = "https://github.com/facet-rs/facet" }
 facet-reflect = { git = "https://github.com/facet-rs/facet" }
+
+# Optimize WASM builds for size
+[profile.release.package.styx-wasm]
+opt-level = "s"
