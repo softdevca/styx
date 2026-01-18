@@ -534,6 +534,7 @@ dependencies = [
  "insta",
  "styx-format",
  "styx-parse",
+ "styx-schema",
  "tracing",
 ]
 
