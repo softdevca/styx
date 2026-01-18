@@ -23,6 +23,8 @@ schema {
     version @string
     /// Human-readable description.
     description @optional(@string)
+    /// Crate name for publishing to crates.io.
+    crate @optional(@string)
   }
 
   /// A type constraint.
