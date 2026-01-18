@@ -2,7 +2,6 @@
 .cache
 .claude
 target/
-Cargo.lock
 .playwright-mcp/
 node_modules/
 pnpm-lock.yaml
