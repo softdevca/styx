@@ -41,6 +41,7 @@ styx-tree = { path = "crates/styx-tree" }
 styx-schema = { path = "crates/styx-schema" }
 styx-cst = { path = "crates/styx-cst" }
 styx-lsp = { path = "crates/styx-lsp" }
+styx-embed = { path = "crates/styx-embed" }
 facet-styx = { path = "crates/facet-styx" }
 
 # Optimize WASM builds for size
