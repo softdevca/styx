@@ -280,3 +280,26 @@ jobs:
 
       - name: Compare with golden
         run: diff -u ../../compliance/golden.sexp output.sexp || true  # Allow failures for now
+
+  ffi-c:
+    name: FFI / C
+    runs-on: depot-ubuntu-24.04-4
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build styx-ffi
+        run: cargo build -p styx-ffi --release
+
+      - name: Compile C example
+        working-directory: crates/styx-ffi/examples
+        run: cc -Wall -Wextra -Werror -o example example.c -I../include -L../../../target/release -lstyx_ffi
+
+      - name: Run C example
+        working-directory: crates/styx-ffi/examples
+        run: LD_LIBRARY_PATH=../../../target/release ./example
