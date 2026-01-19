@@ -54,11 +54,11 @@ fn suggest_similar<'a>(unknown: &str, valid: &'a [String]) -> Option<&'a str> {
         .map(|(v, _)| v)
 }
 
-use crate::error::{
+use crate::schema_error::{
     ValidationError, ValidationErrorKind, ValidationResult, ValidationWarning,
     ValidationWarningKind,
 };
-use crate::types::{
+use crate::schema_types::{
     DefaultSchema, DeprecatedSchema, EnumSchema, FlattenSchema, FloatConstraints, IntConstraints,
     MapSchema, ObjectSchema, OptionalSchema, Schema, SchemaFile, SeqSchema, StringConstraints,
     UnionSchema,

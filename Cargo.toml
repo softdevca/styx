@@ -39,7 +39,6 @@ serde_json = "1"
 styx-parse = { path = "crates/styx-parse" }
 styx-format = { path = "crates/styx-format" }
 styx-tree = { path = "crates/styx-tree" }
-styx-schema = { path = "crates/styx-schema" }
 styx-cst = { path = "crates/styx-cst" }
 styx-lsp = { path = "crates/styx-lsp" }
 styx-embed = { path = "crates/styx-embed" }
