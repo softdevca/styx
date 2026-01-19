@@ -2,9 +2,9 @@
 //!
 //! Run with: cargo run -p styx-schema --bin gen-meta-schema > schema/meta.gen.styx
 
-use styx_schema::{SchemaFile, to_styx_schema};
+use styx_schema::SchemaFile;
 
 fn main() {
-    let schema = to_styx_schema::<SchemaFile>();
+    let schema = facet_styx::schema_from_type::<SchemaFile>();
     print!("{}", schema);
 }
