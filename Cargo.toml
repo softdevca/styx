@@ -48,3 +48,8 @@ facet-styx = { path = "crates/facet-styx" }
 # Optimize WASM builds for size
 [profile.release.package.styx-wasm]
 opt-level = "s"
+
+# The profile that 'dist' will build with
+[profile.dist]
+inherits = "release"
+lto = "thin"
