@@ -1,0 +1,106 @@
+[workspace]
+changelog_update = true
+semver_check = true
+dependencies_update = true
+git_release_enable = true
+
+# ============================================================================
+# Publishable packages - all synchronized versions, single changelog
+# ============================================================================
+
+# Core parsing and tree
+[[package]]
+name = "styx-parse"
+version_group = "styx"
+changelog_path = "CHANGELOG.md"
+
+[[package]]
+name = "styx-tree"
+version_group = "styx"
+changelog_path = "CHANGELOG.md"
+
+[[package]]
+name = "styx-cst"
+version_group = "styx"
+changelog_path = "CHANGELOG.md"
+
+# Formatting
+[[package]]
+name = "styx-format"
+version_group = "styx"
+changelog_path = "CHANGELOG.md"
+
+# LSP
+[[package]]
+name = "styx-lsp"
+version_group = "styx"
+changelog_path = "CHANGELOG.md"
+
+[[package]]
+name = "styx-lsp-ext"
+version_group = "styx"
+changelog_path = "CHANGELOG.md"
+
+[[package]]
+name = "styx-lsp-test-schema"
+version_group = "styx"
+changelog_path = "CHANGELOG.md"
+
+# Embedding
+[[package]]
+name = "styx-embed"
+version_group = "styx"
+changelog_path = "CHANGELOG.md"
+
+[[package]]
+name = "styx-embed-macros"
+version_group = "styx"
+changelog_path = "CHANGELOG.md"
+
+# Integration crates
+[[package]]
+name = "facet-styx"
+version_group = "styx"
+changelog_path = "CHANGELOG.md"
+
+[[package]]
+name = "serde_styx"
+version_group = "styx"
+changelog_path = "CHANGELOG.md"
+
+# CLI
+[[package]]
+name = "styx-cli"
+version_group = "styx"
+changelog_path = "CHANGELOG.md"
+
+# FFI and WASM
+[[package]]
+name = "styx-ffi"
+version_group = "styx"
+changelog_path = "CHANGELOG.md"
+
+[[package]]
+name = "styx-wasm"
+version_group = "styx"
+changelog_path = "CHANGELOG.md"
+
+# Tree-sitter
+[[package]]
+name = "tree-sitter-styx"
+version_group = "styx"
+changelog_path = "CHANGELOG.md"
+
+# ============================================================================
+# Dev-only packages - excluded from releases
+# ============================================================================
+
+[[package]]
+name = "xtask"
+release = false
+publish = false
+
+[[package]]
+name = "styx-compat-tests"
+release = false
+publish = false
