@@ -695,6 +695,7 @@ dependencies = [
  "facet-format",
  "facet-reflect",
  "facet-testhelpers",
+ "figue",
  "insta",
  "serde_json",
  "styx-format",
