@@ -766,7 +766,7 @@ checksum = "37909eebbb50d72f9059c3b6d82c0463f2ff062c9e95845c43a6c9c0355411be"
 [[package]]
 name = "figue"
 version = "1.0.0"
-source = "git+https://github.com/bearcove/figue?branch=main#fff9cd44a4f970a222f1be6d5d853179174b1805"
+source = "git+https://github.com/bearcove/figue?branch=main#a2260a828fb44fb82e8295fd27ef0e1d2e917a12"
 dependencies = [
  "ariadne",
  "camino",
@@ -790,7 +790,7 @@ dependencies = [
 [[package]]
 name = "figue-attrs"
 version = "1.0.0"
-source = "git+https://github.com/bearcove/figue?branch=main#fff9cd44a4f970a222f1be6d5d853179174b1805"
+source = "git+https://github.com/bearcove/figue?branch=main#a2260a828fb44fb82e8295fd27ef0e1d2e917a12"
 dependencies = [
  "facet",
 ]
