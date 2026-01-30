@@ -2040,6 +2040,7 @@ dependencies = [
  "styx-gen-go",
  "styx-lsp",
  "styx-parse",
+ "styx-tokenizer",
  "styx-tree",
  "tokio",
  "which",
@@ -2060,8 +2061,8 @@ name = "styx-cst"
 version = "1.0.1"
 dependencies = [
  "rowan",
- "styx-parse",
  "styx-testhelpers",
+ "styx-tokenizer",
 ]
 
 [[package]]
@@ -2100,11 +2101,9 @@ version = "1.0.1"
 dependencies = [
  "insta",
  "proptest",
- "rowan",
  "styx-cst",
  "styx-parse",
  "styx-tree",
- "tracing",
 ]
 
 [[package]]
@@ -2166,6 +2165,7 @@ dependencies = [
  "facet",
  "facet-testhelpers",
  "styx-testhelpers",
+ "styx-tokenizer",
  "tracing",
 ]
 
@@ -2174,6 +2174,15 @@ name = "styx-testhelpers"
 version = "1.0.0"
 dependencies = [
  "ariadne",
+]
+
+[[package]]
+name = "styx-tokenizer"
+version = "1.0.0"
+dependencies = [
+ "facet",
+ "facet-testhelpers",
+ "tracing",
 ]
 
 [[package]]
