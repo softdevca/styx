@@ -2183,6 +2183,7 @@ dependencies = [
  "facet",
  "facet-json",
  "facet-postcard",
+ "facet-testhelpers",
  "insta",
  "strip-ansi-escapes",
  "styx-parse",
